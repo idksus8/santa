@@ -1,21 +1,38 @@
-// POST /api/spin  { name, tries }
-// Picks a random name for `name`. Answers:
-//   { status: "ok",    landed }  -> that's your match (saved, can't change)
-//   { status: "again", landed }  -> not available for you, spin again
-//   { status: "busy" }           -> someone else was spinning, page retries
+// Secret Santa server part. On GitHub this file must live at: api/spin.js
+// POST /api/spin  { name, tries }  -> picks a random name for that person
+// GET  /api/spin?reset=YOUR_ADMIN_KEY -> clears every pick (set ADMIN_KEY in Vercel first)
 const crypto = require("crypto");
-const config = require("../config.json");
-const { redis, configured } = require("./_redis");
 
-const NAMES = config.names;
-const BANNED = config.banned || [];
+// Keep these in sync with the list inside index.html
+const NAMES = ["Chloe", "Darasimi", "Krysinte", "Lindsey", "Emmeri", "Kenny", "Louis", "Areez"];
+const BANNED = [
+  ["Areez", "Darasimi"],
+  ["Areez", "Kenny"],
+  ["Areez", "Louis"],
+  ["Lindsey", "Krysinte"],
+  ["Emmeri", "Chloe"]
+];
+
+const BASE = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const PICKS = "santa:picks";
 const LOCK = "santa:lock";
+
+async function redis(...command) {
+  const r = await fetch(BASE, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify(command)
+  });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data.result;
+}
 
 const isBanned = (a, b) => BANNED.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 const allowed = (giver, getter) => giver !== getter && !isBanned(giver, getter);
 
-// Can everyone who still needs a match still get one? (small bipartite matching)
+// Can everyone who still needs a match still get one?
 function canFinish(picks) {
   const givers = NAMES.filter((n) => !(n in picks));
   const taken = new Set(Object.values(picks));
@@ -40,8 +57,21 @@ function toObject(flat) {
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+
+  if (!BASE || !TOKEN) {
+    return res.status(500).json({ error: "Storage isn’t connected yet. Add Upstash Redis in Vercel, then redeploy." });
+  }
+
+  // Organizer reset: /api/spin?reset=YOUR_ADMIN_KEY
+  if (req.method === "GET") {
+    const adminKey = process.env.ADMIN_KEY;
+    if (!adminKey || !req.query || req.query.reset !== adminKey) return res.status(403).send("Wrong key, or ADMIN_KEY isn’t set in Vercel.");
+    await redis("DEL", PICKS);
+    await redis("DEL", LOCK);
+    return res.status(200).send("All picks cleared. Everyone can spin again.");
+  }
+
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  if (!configured()) return res.status(500).json({ error: "Storage isn’t connected yet. Add the Upstash Redis integration in Vercel." });
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
