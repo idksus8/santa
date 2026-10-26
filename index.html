@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secret Santa</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦌</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #b3202a;
+    --red-deep: #8a1620;
+    --cream: #f5ecd9;
+    --green: #1f4d38;
+    --mustard: #f2b632;
+    --ink: #1f1714;
+    --display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+    --marker: "Permanent Marker", "Marker Felt", "Segoe Print", "Comic Sans MS", cursive;
+    --outline: 3px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--display);
+    font-weight: 500;
+    background: var(--red);
+    color: var(--cream);
+    min-height: 100vh;
+    padding: 2.5rem 1.25rem 3rem;
+    overflow-x: hidden;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+
+  /* Cut-out sticker look for every image */
+  .sticker {
+    display: block;
+    pointer-events: none;
+    user-select: none;
+    filter:
+      drop-shadow(var(--outline) 0 0 var(--cream))
+      drop-shadow(calc(var(--outline) * -1) 0 0 var(--cream))
+      drop-shadow(0 var(--outline) 0 var(--cream))
+      drop-shadow(0 calc(var(--outline) * -1) 0 var(--cream))
+      drop-shadow(0 10px 12px rgba(0, 0, 0, .3));
+  }
+
+  /* Header */
+  .top {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 1rem; margin-bottom: 2.75rem;
+  }
+  h1 {
+    font-weight: 800;
+    font-size: clamp(3.4rem, 13vw, 8.5rem);
+    line-height: .86;
+    letter-spacing: -0.04em;
+    margin: 0 0 1.25rem;
+  }
+  .top p { margin: 0; font-size: 1.15rem; line-height: 1.4; max-width: 28ch; }
+  .hero { height: clamp(150px, 30vw, 320px); width: auto; transform: rotate(4deg); flex-shrink: 0; --outline: 4px; }
+
+  /* Name tags */
+  .tags {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1.6rem 1.4rem;
+  }
+  .tags li { --r: 0deg; --band: var(--red-deep); }
+  .tags li:nth-child(1) { --r: -2.5deg; }
+  .tags li:nth-child(2) { --r: 1.5deg; --band: var(--green); }
+  .tags li:nth-child(3) { --r: -1deg; }
+  .tags li:nth-child(4) { --r: 2.6deg; --band: var(--green); }
+  .tags li:nth-child(5) { --r: 1deg; --band: var(--green); }
+  .tags li:nth-child(6) { --r: -2deg; }
+  .tags li:nth-child(7) { --r: 2deg; --band: var(--green); }
+  .tags li:nth-child(8) { --r: -1.5deg; }
+
+  .tag {
+    all: unset; box-sizing: border-box; display: block; width: 100%; cursor: pointer;
+    background: var(--cream); color: var(--ink);
+    border-radius: 8px; overflow: hidden; text-align: center;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, .15), 0 14px 18px -10px rgba(0, 0, 0, .55);
+    transform: rotate(var(--r));
+    transition: transform .16s ease;
+  }
+  .tag:hover, .tag:focus-visible { transform: rotate(0deg) translateY(-5px); }
+  .tag:focus-visible { outline: 3px solid var(--mustard); outline-offset: 4px; }
+  .tag .hi {
+    display: block; background: var(--band); color: #fff;
+    font-weight: 800; font-size: 1rem; padding: .6rem 0 .5rem;
+  }
+  .tag .name {
+    display: block; font-family: var(--marker); font-size: 2.3rem; line-height: 1.1;
+    padding: 1.2rem .6rem 1.5rem; overflow-wrap: anywhere;
+  }
+
+  /* Footer */
+  footer { display: flex; align-items: center; gap: .5rem; margin-top: 2.5rem; }
+  footer img { width: 120px; height: auto; transform: rotate(-6deg); flex-shrink: 0; --outline: 2.5px; }
+  footer p { margin: 0; max-width: 30ch; line-height: 1.4; }
+
+  /* Reveal dialog */
+  dialog {
+    border: 0; padding: 175px 0 0; background: transparent; color: var(--ink);
+    width: min(460px, 92vw); max-width: none; max-height: calc(100dvh - 12px); overflow-x: hidden; overflow-y: auto;
+  }
+  dialog::backdrop { background: rgba(40, 6, 10, .82); }
+
+  .card {
+    --mh: 150px;
+    position: relative; background: var(--cream);
+    border-radius: 12px; padding: 1.75rem 1.5rem 1.5rem;
+    box-shadow: 0 24px 40px -12px rgba(0, 0, 0, .6);
+  }
+  .mascot { position: absolute; right: 1.25rem; bottom: calc(100% - 18px); height: var(--mh); width: auto; --outline: 2.5px; }
+  .card[data-stage="spin"] { --mh: 125px; }
+  .card[data-stage="reveal"] { --mh: 172px; }
+  .card[data-stage="again"] { --mh: 150px; }
+  .card[data-stage="spin"] .mascot { animation: wobble .45s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+  .card[data-stage="again"] .mascot { animation: shake .55s ease-in-out both; transform-origin: 50% 100%; }
+  @keyframes shake { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-7deg); } 40% { transform: rotate(6deg); } 60% { transform: rotate(-4deg); } 80% { transform: rotate(3deg); } }
+  .card[data-stage="reveal"] .mascot { animation: pop .55s cubic-bezier(.2, 1.5, .4, 1) both; transform-origin: 50% 100%; }
+  @keyframes wobble { from { transform: rotate(-5deg); } to { transform: rotate(5deg) translateY(-4px); } }
+  @keyframes pop { from { transform: scale(.4) rotate(-10deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .card h2 { font-weight: 800; font-size: 1.8rem; line-height: 1.05; letter-spacing: -0.025em; margin: 0 0 .45rem; padding-right: 7rem; }
+  .card .sub { margin: 0 0 .75rem; color: #5b4a42; line-height: 1.4; padding-right: 3rem; }
+  .card .sub:empty { display: none; }
+
+  /* Prize wheel */
+  .wheel { --ws: min(270px, 70vw); position: relative; width: var(--ws); height: var(--ws); margin: 1.1rem auto 0; }
+  .disc { width: 100%; height: 100%; will-change: transform; }
+  .disc svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 8px 10px rgba(0,0,0,.25)); }
+  .seg.c0 { fill: var(--red); } .seg.c1 { fill: #fffaf0; } .seg.c2 { fill: var(--green); }
+  .lbl { font-family: var(--marker); font-size: 21px; }
+  .lbl.l0 { fill: var(--cream); } .lbl.l1 { fill: var(--ink); }
+  .seg.win { fill: var(--mustard) !important; }
+  .lbl.win { fill: var(--ink) !important; }
+  .seg.no { fill: #8f857b !important; }
+  .lbl.no { fill: #fff !important; }
+  .pointer { position: absolute; top: -14px; left: 50%; width: 30px; margin-left: -15px; z-index: 3; transform-origin: 50% 15%; }
+  .result {
+    min-height: 3.6rem; margin-top: .9rem; text-align: center;
+    font-family: var(--marker); font-size: 2.7rem; line-height: 1.25; color: var(--red); overflow-wrap: anywhere;
+  }
+  .result.ph { color: #cdbfa4; }
+  .result.no { color: #a99b8c; text-decoration: line-through; text-decoration-thickness: 3px; }
+  .result.show { animation: land .5s cubic-bezier(.2, 1.6, .4, 1) both; }
+  @keyframes land { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .row { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; justify-content: center; }
+  .btn {
+    font: 800 1rem var(--display); cursor: pointer; border-radius: 8px; padding: .85rem 1.3rem;
+    border: 2px solid var(--red); background: var(--red); color: var(--cream);
+  }
+  .btn.ghost { background: transparent; border-color: var(--ink); color: var(--ink); }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  #row-again, #row-done { display: none; }
+  .card[data-stage="spin"] #row-confirm { visibility: hidden; }
+  .card[data-stage="again"] #row-confirm, .card[data-stage="reveal"] #row-confirm { display: none; }
+  .card[data-stage="again"] #row-again { display: flex; }
+  .card[data-stage="reveal"] #row-done { display: flex; }
+  .load-error { color: var(--cream); font-size: 1.1rem; }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  @media (max-width: 560px) {
+    .top p { font-size: 1rem; }
+    .tags { grid-template-columns: 1fr 1fr; gap: 1.2rem .9rem; }
+    .tag .name { font-size: 1.7rem; padding: 1rem .4rem 1.2rem; }
+    .result { font-size: 2.3rem; }
+    .card h2 { font-size: 1.55rem; padding-right: 6rem; }
+    .card[data-stage="reveal"] { --mh: 150px; }
+    dialog { padding-top: 160px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tag { transition: none; }
+    .card .mascot, .result.show { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <header class="top">
+    <div>
+      <h1>Secret<br>Santa</h1>
+      <p>Tap your name tag to find out who you’re buying for. Don’t look at anyone else’s.</p>
+    </div>
+    <img class="hero sticker" src="img/santa-photo.webp" width="668" height="733" alt="">
+  </header>
+
+  <ul class="tags" id="tags"></ul>
+
+  <footer>
+    <img class="sticker" src="img/reindeer.webp" width="360" height="360" alt="">
+    <p>Once you’ve seen your match, close it and tell nobody.</p>
+  </footer>
+</main>
+
+<dialog id="dlg" aria-labelledby="dlg-title">
+  <div class="card" id="card" data-stage="confirm">
+    <img class="mascot sticker" id="mascot" src="img/stag.webp" width="545" height="767" alt="">
+    <h2 id="dlg-title"></h2>
+    <p class="sub" id="sub"></p>
+    <div class="wheel" id="wheel" aria-hidden="true">
+      <svg class="pointer" viewBox="0 0 32 40"><path d="M16 38 L3 7 Q16 -2 29 7 Z" fill="#f2b632" stroke="#1f1714" stroke-width="3" stroke-linejoin="round"/></svg>
+      <div class="disc" id="disc"></div>
+    </div>
+    <div class="result" id="result" aria-hidden="true"></div>
+    <div class="row" id="row-confirm">
+      <button class="btn" id="yes">Show my match</button>
+      <button class="btn ghost" id="no">Not me</button>
+    </div>
+    <div class="row" id="row-again">
+      <button class="btn" id="again">Spin again</button>
+    </div>
+    <div class="row" id="row-done">
+      <button class="btn" id="done">Hide it</button>
+    </div>
+    <p class="sr" id="sr" aria-live="polite"></p>
+  </div>
+</dialog>
+
+<script>
+  // The names and banned pairs live in config.json. The draw itself happens on
+  // the server (api/spin.js), so every phone sees the same, shared picks.
+  const $ = (id) => document.getElementById(id);
+  const dlg = $("dlg"), card = $("card"), mascot = $("mascot");
+  const title = $("dlg-title"), sub = $("sub"), sr = $("sr");
+  const disc = $("disc"), result = $("result"), pointer = document.querySelector(".pointer");
+  const list = $("tags");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const IMAGES = {
+    stag:  { src: "img/stag.webp", w: 545, h: 767 },
+    deer:  { src: "img/reindeer.webp", w: 360, h: 360 },
+    santa: { src: "img/santa-cartoon.webp", w: 557, h: 900 }
+  };
+  Object.values(IMAGES).forEach((m) => { new Image().src = m.src; }); // warm the cache
+
+  let NAMES = [], N = 0, SEG = 0;
+  let currentName = null;
+  let runId = 0;      // bumps whenever the dialog resets, so an old spin stops itself
+  let curAngle = 0;   // where the wheel is pointing right now
+  let tries = 0;      // unlucky spins in a row for this person
+
+  // ---- Start-up --------------------------------------------------------------
+  (async function init() {
+    try {
+      const r = await fetch("config.json", { cache: "no-store" });
+      if (!r.ok) throw new Error("config");
+      const cfg = await r.json();
+      NAMES = cfg.names; N = NAMES.length; SEG = 360 / N;
+    } catch (e) {
+      list.innerHTML = '<li class="load-error">Couldn’t load the names. Refresh the page and try again.</li>';
+      return;
+    }
+    buildTags();
+    buildWheel();
+  })();
+
+  function buildTags() {
+    NAMES.forEach((name) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.className = "tag";
+      b.innerHTML = '<span class="hi">Hi, I’m</span><span class="name"></span>';
+      b.querySelector(".name").textContent = name;
+      b.addEventListener("click", () => openFor(name));
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+  }
+
+  // ---- The wheel (drawn once) ------------------------------------------------
+  function buildWheel() {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "-170 -170 340 340");
+    const el = (tag, attrs, text) => {
+      const e = document.createElementNS(NS, tag);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      if (text !== undefined) e.textContent = text;
+      return e;
+    };
+    const R = 152;
+    const pt = (deg, r) => {
+      const a = deg * Math.PI / 180;
+      return [(r * Math.sin(a)).toFixed(2), (-r * Math.cos(a)).toFixed(2)];
+    };
+    NAMES.forEach((name, i) => {
+      const [x0, y0] = pt((i - .5) * SEG, R), [x1, y1] = pt((i + .5) * SEG, R);
+      const colour = i % 2 ? "c1" : (i % 4 === 0 ? "c0" : "c2");
+      const g = el("g", { id: "seg" + i });
+      g.appendChild(el("path", { class: "seg " + colour, d: `M0 0 L${x0} ${y0} A${R} ${R} 0 0 1 ${x1} ${y1} Z` }));
+      g.appendChild(el("text", {
+        class: "lbl " + (colour === "c1" ? "l1" : "l0"),
+        x: R - 16, y: 7, "text-anchor": "end",
+        transform: `rotate(${i * SEG - 90})`
+      }, name));
+      svg.appendChild(g);
+    });
+    svg.appendChild(el("circle", { r: 158, fill: "none", stroke: "#1f1714", "stroke-width": 12 }));
+    for (let i = 0; i < N; i++) {
+      const [bx, by] = pt((i + .5) * SEG, 158);
+      svg.appendChild(el("circle", { cx: bx, cy: by, r: 4.5, fill: "#f2b632" }));
+    }
+    svg.appendChild(el("circle", { r: 20, fill: "#1f1714" }));
+    svg.appendChild(el("circle", { r: 8, fill: "#f2b632" }));
+    disc.appendChild(svg);
+  }
+
+  function clearMarks() {
+    disc.querySelectorAll(".win, .no").forEach((n) => n.classList.remove("win", "no"));
+  }
+
+  // ---- Dialog stages -------------------------------------------------------
+  function setMascot(key) {
+    const m = IMAGES[key];
+    mascot.src = m.src; mascot.width = m.w; mascot.height = m.h;
+  }
+
+  function openFor(name) {
+    currentName = name;
+    runId++;
+    tries = 0; curAngle = 0;
+    card.dataset.stage = "confirm";
+    setMascot("stag");
+    title.textContent = `Are you ${name}?`;
+    sub.textContent = "The stag can tell if you’re lying.";
+    disc.style.transform = "none";
+    clearMarks();
+    result.textContent = "???"; result.className = "result ph";
+    sr.textContent = "";
+    $("again").textContent = "Spin again";
+    dlg.showModal();
+    $("yes").focus();
+  }
+
+  // Ask the server what the wheel lands on.
+  async function requestSpin() {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const r = await fetch("/api/spin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: currentName, tries })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Server error");
+      if (data.status === "busy") { await sleep(500); continue; } // someone else is spinning
+      return data;
+    }
+    throw new Error("Too many people spinning at once. Try again in a moment.");
+  }
+
+  async function startSpin() {
+    const myRun = ++runId;
+    card.dataset.stage = "spin";
+    setMascot("deer");
+    title.textContent = "Spinning…";
+    sub.textContent = "No peeking at anyone else’s screen.";
+    result.textContent = "???"; result.className = "result ph";
+    clearMarks();
+
+    let data;
+    try {
+      data = await requestSpin();
+      if (NAMES.indexOf(data.landed) < 0) throw new Error("Bad answer");
+    } catch (e) {
+      if (myRun !== runId) return;
+      showProblem(e.message || "Couldn’t reach the server.");
+      return;
+    }
+    if (myRun !== runId) return;
+
+    const idx = NAMES.indexOf(data.landed);
+    const quick = reduceMotion.matches;
+    const jitter = (Math.random() - .5) * SEG * .6; // land inside the slice, not always dead centre
+    const delta = (((-(idx * SEG + jitter) - curAngle) % 360) + 360) % 360;
+    const startAngle = curAngle;
+    const endAngle = startAngle + (quick ? 360 : 360 * (tries > 0 ? 4 : 6)) + delta;
+    const duration = quick ? 800 : (tries > 0 ? 4200 : 6000);
+    const t0 = performance.now();
+    let lastSlice = 0;
+
+    function frame(now) {
+      if (myRun !== runId) return;
+      const t = Math.min(1, (now - t0) / duration);
+      const eased = 1 - Math.pow(1 - t, 4);
+      const angle = startAngle + eased * (endAngle - startAngle);
+      disc.style.transform = `rotate(${angle}deg)`;
+
+      // Flick the pointer each time a slice boundary passes under it.
+      const slice = Math.round(((-angle % 360) + 360) % 360 / SEG);
+      if (slice !== lastSlice) {
+        lastSlice = slice;
+        if (!quick && pointer.animate) {
+          pointer.animate([{ transform: "rotate(-24deg)" }, { transform: "rotate(0deg)" }], { duration: 130, easing: "ease-out" });
+        }
+      }
+      if (t < 1) { requestAnimationFrame(frame); return; }
+      curAngle = endAngle;
+      landed(myRun, idx, data.status);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function landed(myRun, idx, status) {
+    if (myRun !== runId) return;
+    const mark = status === "ok" ? "win" : "no";
+    disc.querySelectorAll(`#seg${idx} *`).forEach((n) => n.classList.add(mark));
+    setTimeout(() => {
+      if (myRun !== runId) return;
+      const name = NAMES[idx];
+      if (status === "ok") {
+        card.dataset.stage = "reveal";
+        setMascot("santa");
+        title.textContent = "You’re Secret Santa for";
+        sub.textContent = "";
+        result.textContent = name;
+        result.className = "result show";
+        sr.textContent = `You are Secret Santa for ${name}.`;
+        $("done").focus();
+      } else {
+        tries++;
+        card.dataset.stage = "again";
+        setMascot("stag");
+        title.textContent = "Not them. Spin again!";
+        sub.textContent = "That name isn’t available for you.";
+        result.textContent = name;
+        result.className = "result no";
+        sr.textContent = `${name} isn’t available for you. Spin again.`;
+        $("again").textContent = "Spin again";
+        $("again").focus();
+      }
+    }, 700);
+  }
+
+  function showProblem(message) {
+    card.dataset.stage = "again";
+    setMascot("stag");
+    title.textContent = "That didn’t work";
+    sub.textContent = message;
+    result.textContent = "???"; result.className = "result ph";
+    sr.textContent = message;
+    $("again").textContent = "Try again";
+    $("again").focus();
+  }
+
+  $("yes").addEventListener("click", startSpin);
+  $("again").addEventListener("click", startSpin);
+  $("no").addEventListener("click", () => dlg.close());
+  $("done").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("click", (e) => { if (e.target === dlg && card.dataset.stage !== "spin") dlg.close(); });
+
+  // Clear everything on close so the name isn't left on screen.
+  dlg.addEventListener("close", () => {
+    runId++;
+    currentName = null; tries = 0; curAngle = 0;
+    card.dataset.stage = "confirm";
+    title.textContent = ""; sub.textContent = ""; sr.textContent = "";
+    result.textContent = ""; result.className = "result";
+    disc.style.transform = "none";
+    clearMarks();
+  });
+</script>
+</body>
+</html>
