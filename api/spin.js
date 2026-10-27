@@ -1,8 +1,9 @@
-// POST /api/spin  { name, tries }
-// Picks a random name for `name`. Answers:
-//   { status: "ok",    landed }  -> that's your match (saved, can't change)
-//   { status: "again", landed }  -> not available for you, spin again
-//   { status: "busy" }           -> someone else was spinning, page retries
+// POST /api/spin { name, options: true } -> the names this person can get (their wheel)
+// POST /api/spin { name }                -> spins: picks a random name from those options
+//   { status: "ok", landed }  -> that's your match (saved, can't change)
+//   { status: "busy" }        -> someone else was spinning, the page retries
+// POST /api/spin { name, seen: true }    -> they've seen it, so their tag disappears
+// GET  /api/spin                          -> { done: [names whose tags should disappear] }
 const crypto = require("crypto");
 const config = require("../config.json");
 const { redis, configured } = require("./_redis");
@@ -62,7 +63,6 @@ module.exports = async (req, res) => {
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
   const name = body && body.name;
-  const tries = Math.max(0, parseInt(body && body.tries, 10) || 0);
   if (!NAMES.includes(name)) return res.status(400).json({ error: "Unknown name" });
 
   // The person has seen their match: hide their tag for everyone.
@@ -74,6 +74,24 @@ module.exports = async (req, res) => {
       return res.status(200).json({ status: "ok" });
     } catch (err) {
       return res.status(500).json({ error: "Something went wrong." });
+    }
+  }
+
+  // This person's wheel: only names they can actually get.
+  if (body && body.options) {
+    try {
+      const { picks } = split(await redis("HGETALL", PICKS));
+      let options;
+      if (picks[name]) {
+        // They already spun: show a normal wheel, the spin will return their saved match.
+        options = NAMES.filter((t) => allowed(name, t));
+      } else {
+        const taken = new Set(Object.values(picks));
+        options = NAMES.filter((t) => allowed(name, t) && !taken.has(t) && canFinish({ ...picks, [name]: t }));
+      }
+      return res.status(200).json({ status: "ok", options });
+    } catch (err) {
+      return res.status(500).json({ error: "Something went wrong. Try again." });
     }
   }
 
@@ -91,17 +109,10 @@ module.exports = async (req, res) => {
       const taken = new Set(Object.values(picks));
       const valid = (t) => allowed(name, t) && !taken.has(t) && canFinish({ ...picks, [name]: t });
 
-      let landed;
-      if (tries >= 2) {
-        // After two unlucky spins, land on someone who works, so nobody spins forever.
-        const options = NAMES.filter(valid);
-        if (!options.length) return res.status(500).json({ error: "No valid match left. Ask the organizer to reset." });
-        landed = options[crypto.randomInt(options.length)];
-      } else {
-        landed = NAMES[crypto.randomInt(NAMES.length)];
-      }
-
-      if (!valid(landed)) return res.status(200).json({ status: "again", landed });
+      // Everyone left on this person's wheel is a valid match, so land on one at random.
+      const options = NAMES.filter(valid);
+      if (!options.length) return res.status(500).json({ error: "No valid match left. Ask the organizer to reset." });
+      const landed = options[crypto.randomInt(options.length)];
 
       await redis("HSET", PICKS, name, landed);
       return res.status(200).json({ status: "ok", landed });
