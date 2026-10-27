@@ -32,16 +32,32 @@ function canFinish(picks) {
   return givers.every((g) => place(g, new Set()));
 }
 
-function toObject(flat) {
-  const out = {};
-  for (let i = 0; i < (flat || []).length; i += 2) out[flat[i]] = flat[i + 1];
-  return out;
+// The hash holds picks ("Kenny" -> "Louis") and "seen:Kenny" markers for people
+// who have already looked at their match.
+function split(flat) {
+  const picks = {}, seen = [];
+  for (let i = 0; i < (flat || []).length; i += 2) {
+    const key = flat[i], value = flat[i + 1];
+    if (key.startsWith("seen:")) seen.push(key.slice(5));
+    else picks[key] = value;
+  }
+  return { picks, seen };
 }
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   if (!configured()) return res.status(500).json({ error: "Storage isn’t connected yet. Add the Upstash Redis integration in Vercel." });
+
+  // GET: which tags should disappear (names only, never who got whom)
+  if (req.method === "GET") {
+    try {
+      const { seen } = split(await redis("HGETALL", PICKS));
+      return res.status(200).json({ done: seen });
+    } catch (err) {
+      return res.status(500).json({ error: "Couldn’t load." });
+    }
+  }
+  if (req.method !== "POST") return res.status(405).json({ error: "GET or POST only" });
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
@@ -49,13 +65,25 @@ module.exports = async (req, res) => {
   const tries = Math.max(0, parseInt(body && body.tries, 10) || 0);
   if (!NAMES.includes(name)) return res.status(400).json({ error: "Unknown name" });
 
+  // The person has seen their match: hide their tag for everyone.
+  if (body && body.seen) {
+    try {
+      const existing = await redis("HGET", PICKS, name);
+      if (!existing) return res.status(200).json({ status: "none" });
+      await redis("HSET", PICKS, "seen:" + name, "1");
+      return res.status(200).json({ status: "ok" });
+    } catch (err) {
+      return res.status(500).json({ error: "Something went wrong." });
+    }
+  }
+
   try {
     // One spin at a time, so two phones can never grab the same person.
     const gotLock = await redis("SET", LOCK, crypto.randomUUID(), "NX", "EX", "10");
     if (gotLock !== "OK") return res.status(200).json({ status: "busy" });
 
     try {
-      const picks = toObject(await redis("HGETALL", PICKS));
+      const { picks } = split(await redis("HGETALL", PICKS));
 
       // Already spun before? Same answer every time.
       if (picks[name]) return res.status(200).json({ status: "ok", landed: picks[name] });
