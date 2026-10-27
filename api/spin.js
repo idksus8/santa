@@ -1,6 +1,6 @@
-// POST /api/spin { name, options: true } -> the names this person can get (their wheel)
+// POST /api/spin { name, options: true } -> the names on this person's wheel
 // POST /api/spin { name }                -> spins: picks a random name from those options
-//   { status: "ok", landed }  -> that's your match (saved, can't change)
+//   { status: "ok", landed }  -> that's your match (saved, can't change; never a banned name)
 //   { status: "busy" }        -> someone else was spinning, the page retries
 // POST /api/spin { name, seen: true }    -> they've seen it, so their tag disappears
 // GET  /api/spin                          -> { done: [names whose tags should disappear] }
@@ -77,18 +77,14 @@ module.exports = async (req, res) => {
     }
   }
 
-  // This person's wheel: only names they can actually get.
+  // This person's wheel. Banned names stay on it for show but the spin never lands on them.
+  // Only their own name and names someone else already picked are taken off.
   if (body && body.options) {
     try {
       const { picks } = split(await redis("HGETALL", PICKS));
-      let options;
-      if (picks[name]) {
-        // They already spun: show a normal wheel, the spin will return their saved match.
-        options = NAMES.filter((t) => allowed(name, t));
-      } else {
-        const taken = new Set(Object.values(picks));
-        options = NAMES.filter((t) => allowed(name, t) && !taken.has(t) && canFinish({ ...picks, [name]: t }));
-      }
+      const taken = new Set(Object.values(picks));
+      // If they already spun, show a full wheel; the spin returns their saved match.
+      const options = NAMES.filter((t) => t !== name && (picks[name] || !taken.has(t)));
       return res.status(200).json({ status: "ok", options });
     } catch (err) {
       return res.status(500).json({ error: "Something went wrong. Try again." });
