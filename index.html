@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Secret Santa</title>
+<title>Sexy (Secret) Santa</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦌</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,6 +58,7 @@
     letter-spacing: -0.04em;
     margin: 0 0 1.25rem;
   }
+  h1 small { display: block; font-size: .3em; letter-spacing: 0; line-height: 1; margin: .12em 0 .2em .1em; }
   .top p { margin: 0; font-size: 1.15rem; line-height: 1.4; max-width: 28ch; }
   .hero { height: clamp(150px, 30vw, 320px); width: auto; transform: rotate(4deg); flex-shrink: 0; --outline: 4px; }
 
@@ -191,7 +192,7 @@
 <main>
   <header class="top">
     <div>
-      <h1>Secret<br>Santa</h1>
+      <h1>Sexy<small>(Secret)</small>Santa</h1>
       <p>Tap your name tag to find out who you’re buying for. Don’t look at anyone else’s.</p>
     </div>
     <img class="hero sticker" src="img/santa-photo.webp" width="668" height="733" alt="">
@@ -487,11 +488,11 @@
       const name = WHEEL[idx];
       card.dataset.stage = "reveal";
       setMascot("santa");
-      title.textContent = "You’re Secret Santa for";
+      title.textContent = "You’re Sexy (Secret) Santa for";
       sub.textContent = "Screenshot it or remember it. Your name tag disappears when you close this.";
       result.textContent = name;
       result.className = "result show";
-      sr.textContent = `You are Secret Santa for ${name}.`;
+      sr.textContent = `You are Sexy (Secret) Santa for ${name}.`;
       markSeen(currentName);
       $("done").focus();
     }, 700);
