@@ -1,10 +1,10 @@
 {
-  "names": ["Chloe", "Darasimi", "Krysinte", "Lindsey", "Emmeri", "Kenny", "Louis", "Areez"],
+  "names": ["Chloe", "Darasimi", "Krystine", "Lindsey", "Emmeri", "Kenny", "Louis", "Areez"],
   "banned": [
     ["Areez", "Darasimi"],
     ["Areez", "Kenny"],
     ["Areez", "Louis"],
-    ["Lindsey", "Krysinte"],
+    ["Lindsey", "Krystine"],
     ["Emmeri", "Chloe"]
   ]
 }
